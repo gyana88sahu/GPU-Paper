@@ -1,0 +1,19 @@
+\section{Design} \label{sec:design}
+
+\subsection{Syntax of unidirectional PRE Scheme}
+We recall that a non-interactive PRE scheme is an ensemble of PPT algorithms $\Pi = $ (\emph{ParamsGen, KeyGen, ReKeyGen, Encrypt, ReEncrypt, Decrypt}), which can be defined as per the following syntax:
+
+\begin{itemize}
+\item{\textbf{ParamsGen$\left( 1^\lambda\right)$}}: It takes the security parameter $\lambda$ and returns the corresponding public parameters \textit{pp}.
+
+\item{\textbf{KeyGen$\left( pp, 1^\lambda\right)$}}: It takes the public parameters $pp$ and returns the key pair $\left(pk,sk \right)$.
+
+\item{\textbf{ReKeyGen}$\left(pp, sk_i,pk_j \right)$}: It takes the public parameters, secret key of publisher $i$, public key of subscriber $j$ and returns the re-encryption key $rk_{i \rightarrow j}$.
+
+\item{\textbf{Encrypt$\left(pp,pk,m \right)$}}: Given public key and public parameters, it encrypts the message $m$ and returns a ciphertext $c$.
+
+\item{\textbf{ReEncrypt}$\left( pp, rk_{i\rightarrow j},c_i \right)$}: It transforms a ciphertext $c_i$ of the party $i$ into a ciphertext $c_j$ that can be decrypted by party $j$.
+
+\item{\textbf{Decrypt}$\left(pp,sk,c\right)$}: It recovers the message $m$ from ciphertext $c$.
+
+\end{itemize}

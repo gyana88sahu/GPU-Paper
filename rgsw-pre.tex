@@ -1,0 +1,92 @@
+\section{PRE Cryptosystem with Ring-GSW FHE scheme} \label{rgswpre}
+
+The Ring-GSW PRE scheme described here is based on the Ring-GSW FHE  scheme, a RLWE variant of the GSW \cite{gentry2013homomorphic} FHE scheme. The message space for the scheme is restricted to $\mathcal{M} \in R_p$ similar to the BV-FHE scheme.
+
+\subsection{Ring-GSW Encryption Scheme}
+
+The scheme is parameterized similar to the BV-FHE scheme. It consists of the following operations:
+
+\noindent \textbullet~\textbf{ParamsGen$\left(1^\lambda\right)$}: Choose positive integers $q = q\left(\lambda \right)$ and $n = n\left( \lambda \right)$. Return $pp = \left(\ell,N,p,q,h,n\right)$ where $\ell = \lceil \log_2{(q)} /h \rceil$ and $N = 2\ell$. Here $h$ is the relinearization factor.
+
+\noindent \textbullet~\textbf{KeyGen$\left(pp, \lambda \right)$}: Sample polynomials $a \sample \mathcal{U}_q$, $s \sample \mathcal{T}$ and $e \sample \chi_e$. Compute $b := a\cdot s + pe \in R_q$. Set the public key $pk$ and private key $sk$ as follows: $$sk := \left( 1; -s \right) \in R_q^{2 \times 1}, \; pk := \mathbf{A} = \left[a\;b\right] \in R_q^{1\times2}$$
+\noindent \textbullet~\textbf{Encrypt$\left(pp, pk = \mathbf{A}, m \right)$}: Sample random matrix \textbf{R} from  ternary distribution and an error matrix $\mathbf{E} \in R_q^{N \times 2}$ from  discrete Gaussian
+distribution. Compute the ciphertext $\mathbf{C} \in R_q^{N \times 2}$ as follows: 
+\begin{equation*}
+\begin{gathered}
+\mathbf{R} =  \left\{ r_0, \cdots , r_{N - 1}\right\} \sample \mathcal{T}_{R_q}^N , \; \mathbf{E} \sample \chi_{e,R_q}^{N \times 2} \\
+ \mathbf{C}  = m\cdot \mathbf{G} + \mathbf{R}\otimes \mathbf{A} + p\mathbf{E}
+\end{gathered}
+\end{equation*}
+\noindent \textbullet~\textbf{Decrypt}$\left(pp, sk = \left( 1; -s \right), \mathbf{C} \right)$:   Message $m'$ is recovered by multiplying the first row of the ciphertext \textbf{C} with the secret key $sk$. This is
+shown as:
+\begin{gather*}
+m' = \left( \mathbf{C}_0 \times sk \text{ mod } q\right) \text{ mod } p
+\end{gather*}
+
+Decryption works correctly as the first row of the ciphertext is in the form of a BV scheme ciphertext.
+
+\subsection{Proxy Re-Encryption Scheme}
+
+We describe the operations pertaining to PRE computation for a publisher A and a subscriber B as follows:\\
+\noindent \textbullet~\textbf{ReKeyGen}$\left(pp,sk_A,pk_B\right)$: The re-encryption key consists of two polynomial matrices. To generate the matrices, we first sample two ternary uniform matrices $\textbf{R}_0, \textbf{R}_1 \in R_q^N$. Next, we sample two error matrices from $\chi_{e,R_q}$ and set the evaluation matrices $\mathbf{EK}\left(i \right)$ as follows:
+\begin{equation*}
+\begin{gathered}
+\mathbf{R}_i \sample \mathcal{T}_{R_q}^N,  \quad \mathbf{E_i} \sample \chi_{R_q,B}^{N \times 2} , \quad i \in \bin \\
+ \mathbf{EK}[i] = \mathbf{R}_i\otimes \mathbf{A}_B + p\mathbf{E}_i + \left( \textrm{PowerOf2}\left( sk_A \right) \gg i \right)\\ 
+ rk_{A \rightarrow B} = \left\{\; \mathbf{EK}[0],\;\mathbf{EK}[1]\; \right\}
+\end{gathered}
+\end{equation*}
+
+\noindent \textbullet~\textbf{ReEncrypt}$\left(pp, \mathbf{C}_A, rk_{A \rightarrow B}\right)$: We use the top $\ell$ rows of the ciphertext $\mathbf{C}_A$ to perform re-encryption and denote this as $\mathbf{C}_A^{\text{top}}$. Next, we multiply each of the matrices $\mathbf{EK}[i]$ with $\mathbf{C}_A^{\text{top}}$ and reassemble the results into a Ring-GSW ciphertext $\mathbf{C}_{A \rightarrow B}$. This is shown as follows:
+\begin{equation*}
+\begin{gathered}
+ \mathbf{C}_{A \rightarrow B}^i = \textrm{BitDecomp}\left( \mathbf{C}_A^{\text{top}} \right)\cdot \mathbf{EK}[i] \in R_q^{\ell \times 2} \\
+ \mathbf{C}_{A \rightarrow B} = \left[
+\mathbf{C}_{A \rightarrow B}^0 \; ||^\intercal \;
+\mathbf{C}_{A \rightarrow B}^1
+\right]
+\end{gathered}
+\end{equation*}
+
+To formulate the correctness constraint we have to ensure that there is no wrap around mod-$q$ in the noise term $t$ while decrypting the re-encrypted ciphertext. The noise term $t$ is given by:
+\begin{align*}
+t &= \mathbf{C}_{A \rightarrow B,0} \times sk_B = \mathbf{C}_{A \rightarrow B,0,0} - s_B\mathbf{C}_{A \rightarrow B,0,1}
+\end{align*}
+Let $\alpha_i = \textrm{BitDecomp}\left(\mathbf{C}_{A,j,0}^{\text{top}} \right)$ and $\beta_i = \textrm{BitDecomp}\left(\mathbf{C}_{A,j,1}^{\text{top}} \right)$ for $\left(i,j\right) \in \left[0,\ell \right)$. Then, $\mathbf{C}_{A \rightarrow B,0}$ can be shown as:
+\begin{align*}
+\mathbf{C}_{A \rightarrow B,0} = \left[\alpha_i \; \beta_i \right]_{i=0}^{\ell-1} & \cdot \left[r_j\mathbf{A}_B + p\mathbf{E}_j + \textrm{PowerOf2}\left(sk_A \right) \right] \\
+&\text{where } i \in \left[0, \ell \right) \text{ and } j \in \left[0, 2\ell \right).
+\end{align*}
+\begin{align*}
+\mathbf{C}_{A \rightarrow B,0,0} &= b_B\sum_{i=0}^{\ell-1}\left(\alpha_i r_i + \beta_i r_{\ell+i} \right) + p\sum_{i=0}^{\ell-1}\left(\alpha_i \mathbf{E}_{i,0} + \beta_i \mathbf{E}_{\ell+i,0} \right) \\
+& + \sum_{i=0}^{\ell-1}\alpha_i \textrm{PowerOf2}\left(1 \right) + \sum_{i=0}^{\ell-1}\beta_i \textrm{PowerOf2}\left( -s_A \right) \\
+& = b_Br'_0 + p\mathbf{E}'_{0,0} + \alpha - s_A\beta
+\end{align*}
+Similarly, 
+\begin{align*}
+\mathbf{C}_{A \rightarrow B,0,1} &= a_B\sum_{i=0}^{\ell-1}\left(\alpha_i r_i + \beta_i r_{\ell+i} \right) + p\sum_{i=0}^{\ell-1}\left(\alpha_i \mathbf{E}_{i,1} + \beta_i \mathbf{E}_{\ell+i,1} \right) \\
+& = a_Br'_0 + p\mathbf{E}'_{0,1}
+\end{align*}
+Therefore,
+\begin{align*}
+t & = r'_0\left(b_B - a_Bs_B \right) + p\left(\mathbf{E}'_{0,0} - s_B\mathbf{E}'_{0,1}\right) + \alpha - s_A\beta  \; \cong m \text{ mod } p
+\end{align*}
+
+For correct decryption $\norm{t}_\infty \leq q/2$. By using the central limit theorem we arrive at the final correctness constraint:
+\begin{equation*}
+\begin{gathered}
+\norm{t}_\infty  \leq 2p \sqrt{n} D_h D \lceil \log_2{( q)}/h \rceil \cdot \left( 2\sqrt{n} + 1 \right) + 3p\sqrt{n} D  \approx 6pnD_h D \lceil \log_2{( q)}/h \rceil \\
+ \Rightarrow q  \geq 12pnD_h D \lceil \log_2{( q)}/h \rceil \;
+ \end{gathered}
+\end{equation*}
+
+\subsection{Security}
+
+IND-CPA security of the Ring-GSW-PRE scheme is defined in a similar manner as in the BV-PRE scheme and only differs in the parameter of $\rho$ which describes the number of RLWE samples in the re-encryption key. 
+
+\begin{theorem} Under the \textbf{RLWE}$_{\Phi,q,\chi_e}$ assumption, the Ring-GSW PRE scheme is $\indcpa$ secure. Specifically, for a poly-time adversary $\adv$, there exists a poly-time distinguisher
+$\ddv$ such that
+$$\text{Adv}^{cpa}_{\adv}\left(\lambda \right) \leq \left( \rho\cdot\left(Q_{rk}+Q_{re}\right)+ N + 1\right)\cdot\text{Adv}^{\mathbf{RLWE}_{\Phi,q,\chi_e}}_{\ddv}$$ 
+
+\noindent where $Q_{rk}$ and $Q_{re}$ are the numbers of re-encryption key queries and re-encryption queries, respectively; $N$ is the number of honest entities; $\lambda$ is the security parameter; $\Phi$ is the cyclotomic polynomial defining the ring $R_q = \mathbb{Z}_q[x]/\langle\Phi \rangle$ and $\rho := 4\lceil \log_2 (q) \rceil$. 
+\end{theorem}

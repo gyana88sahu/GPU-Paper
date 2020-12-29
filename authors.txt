@@ -1,0 +1,13 @@
+TITLE: Accelerating Lattice based Proxy Re-Encryption schemes on GPUs
+
+FIRST NAME AUTHOR 1: Gyana 
+
+LAST NAME AUTHOR 1 Sahu
+
+FIRST NAME AUTHOR 2: Kurt
+
+LAST NAME AUTHOR 2: Rohloff
+
+CORRESPONDING AUTHOR: Gyana Sahu
+
+EMAIL ADDRESS: grs22@njit.edu

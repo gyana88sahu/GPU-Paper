@@ -1,0 +1,13 @@
+# This file contains data which shows runtime comparison of BitDecomposition on CPU and GPU platforms
+# X-axis represents the Ring Dimension, N
+# Y-axis represents the Runtime in ms
+#Title of Plot: Comparison of #TO-DO
+#	GPU GTX 1050	CPU	GPU Titan RTX
+x	y1		y2	y3
+9	0.3822701	1.3	0.6948644
+10	0.5182932	1.18	0.7573058
+11	0.7431816	2.62	0.8774093
+12	1.178299	4.82	1.12459
+13	2.350282	9.75	1.683884
+14	4.781217	16.57	2.895868
+15	10.30021	28.75	5.325446

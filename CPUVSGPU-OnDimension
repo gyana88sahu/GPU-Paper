@@ -1,0 +1,12 @@
+# This file contains data which shows runtime comparison of NTT on CPU and GPU platforms
+# X-axis represents the Ring Dimension, N
+# Y-axis represents the Runtime in ms
+#Title of Plot: Comparison of #TO-DO
+xcod	GTX		CPU	RTX	
+9	0.0713663	0.038	0.2891086
+10	0.0812895	0.063	0.3281506
+11	0.0873005	0.125	0.3379022
+12	0.087911	0.212	0.333211
+13	0.1492452	0.383	0.3580643
+14	0.2557175	0.882	0.3754619
+15	0.4699567	2.193	0.4192254

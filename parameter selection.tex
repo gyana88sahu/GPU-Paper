@@ -1,0 +1,29 @@
+\section{Parameter Selection} \label{paramSelect}
+
+Estimating parameters for LWE or RLWE based encryption schemes is a significantly challenging task. On one hand we have to ensure that the chosen parameters generate an underlying RLWE instance that is hard to solve as per known attacks while on the other hand we have to also meet the correctness constraint. The correctness constraint can be trivially achieved by choosing an arbitrarily large modulus $q$. However, such a strategy is not suitable for efficient implementation and further leads to insecure LWE instances. It was shown in \cite{laine2015key} when the modulus is exponential in the LWE dimension, $q \geq 2^{\mathcal{O}(n)}$ and error distribution is narrow enough, the secret key can be recovered in polynomial time using standard lattice basis reduction algorithms. In order to layout concrete parameters, Lindner and Peikert \cite{lindner2011better} gave a heuristic relation that computes the runtime of BKZ lattice reduction algorithm for a particular root Hermite factor, $\delta$. This is shown as: $$\log_2{\left(t_{BKZ} \right)} \geq \frac{1.8}{\log_2(\delta)} - 110$$ 
+
+Further, Gentry \textit{et al.} \cite{gentry2012homomorphic} gave a relation which computes minimum LWE dimension secure for a particular modulus $q$, standard deviation of error distribution $\sigma_e$ and root Hermite factor, $\delta$. Combining the two we can express the minimum LWE dimension to support $\kappa$-bits of security as follows:
+$$n \geq \frac{\log_2{\left( q/\sigma_e \right)} \left(\kappa + 110 \right)}{7.2}$$
+
+In particular, we used the runtime of BKZ2.0 \cite{albrecht2015complexity} (considered to be a improved version of BKZ algorithm) given by the relation $$\log_2{\left(t_{\text{BKZ2.0}} \right)} \geq \frac{0.009}{\log_2^2{\delta}} - 27 $$ Again, combining this with the minimum LWE dimension relation from \cite{gentry2012homomorphic} we arrive at our final security constraint as follows:
+$$n \geq \frac{ \log_2{\left( q/\sigma_e \right)} \sqrt{\kappa + 27} } {0.379} $$  
+
+In our implementation we targeted for $\kappa = 128$-bits of security for both BV-PRE and Ring-GSW-PRE scheme. Using the correctness constraint from the respective schemes we generated the working modulus for various ring dimensions as shown in Table \ref{tab:bvpre-params}.
+
+\begin{table}[]
+\caption{Minimum modulus bits, $b$ that satisfies 128-bits of security for the BV-PRE and Ring-GSW PRE scheme according to the respective correctness constraints and varying dimension, $n$. $D = 15$ and $\sigma = 4$.}
+\centering
+%\renewcommand{\arraystretch}{1.2}
+\begin{tabular}{|c|c|c|}
+\hline
+\multirow{2}{*}{$n$} & \multicolumn{2}{c|}{$b$}                                                                                                  \\ \cline{2-3} 
+                   & \begin{tabular}[c]{@{}c@{}}BV-PRE\\ scheme\end{tabular} & \begin{tabular}[c]{@{}c@{}}Ring-GSW-PRE\\ scheme\end{tabular} \\ \hline
+512                & 18                                                      & - \\ \hline
+1024               & 18                                                      & 25                                                            \\ \hline
+2048               & 19                                                      & 26                                                            \\ \hline
+4096               & 19                                                      & 27                                                            \\ \hline
+8192               & 20                                                      & 28                                                            \\ \hline
+16384              & 20                                                      & 29                                                            \\ \hline
+\end{tabular}
+\label{tab:bvpre-params}
+\end{table}

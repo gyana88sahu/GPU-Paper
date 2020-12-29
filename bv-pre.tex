@@ -1,0 +1,63 @@
+\section{PRE Cryptosystem with BV FHE scheme} \label{bvpre}
+
+The BV-PRE \cite{polyakov2017fast} scheme described here is based on the BV FHE \cite{brakerski2011fully} scheme introduced by Brakerski and Vaikuntanathan. The message space for the scheme is restricted to $\mathcal{M} \in R_p$ where $p$ is the plaintext modulus.
+
+\subsection{BV Encryption Scheme}
+
+The scheme is parameterized using the following quantities:
+
+\begin{itemize}
+\item Security parameter $\left( \lambda \right)$,
+\item Ciphertext modulus $q$ and plaintext modulus $2 \leq p \ll q$,
+\item Ring dimension $n$,
+\item $D$-bounded discrete Gaussian error distribution $\chi_e$ with distribution parameter $\sigma_e$,
+\item Ternary uniform distribution $\mathcal{T}$ which samples from  $\left\{ -1, 0, 1 \right\}$, 
+\item Discrete uniform distribution $\mathcal{U}_q$,
+\end{itemize}
+
+
+The scheme consists of the following operations:
+
+\noindent \textbullet\ \textbf{ParamsGen$\left(1^\lambda\right)$}: Choose positive integers $q = q\left(\lambda\right)$ and $n = n\left( \lambda \right)$. Return $pp = \left(p,q,n\right)$.\\
+\noindent \textbullet\ \textbf{KeyGen$\left(pp, \lambda \right)$}: Sample polynomials $a \sample \mathcal{U}_q$, $s \sample \mathcal{T}$ and $e \sample \chi_e$. Compute $b := a\cdot s + pe \in R_q$. Set the public key $pk$ and private key $sk$ as follows: $$sk := \left( 1,s \right) \in R_q^2, \; pk := \left(a,b\right) \in R_q^2$$
+\noindent \textbullet\ \textbf{Encrypt$\left(pp, pk = \left(a,b\right), m \in \mathcal{M} \right)$}: Sample polynomials $v \sample \mathcal{T}, e_0, e_1 \sample \chi_e$. Compute the ciphertext $c = \left( c_0,c_1 \right) \in R_q^2$ as follows: $$c_0 = b\cdot v + pe_0 +m \in R_q, \; c_1 = a\cdot v + pe_1 \in R_q$$
+\noindent \textbullet\ \textbf{Decrypt}$\left(pp, sk = s, c = \left(c_0,c_1\right) \right)$:  Compute the ciphertext error $ t = c_0 - s \cdot c_1 \in R_q$. Output $m' = t  \text{ mod } p$. For correct decryption, the coefficients of the noise polynomial, $t$ should not wrap around modulo $q$.
+
+\subsection{Proxy Re-Encryption Scheme}
+
+We refer to the publisher of information as party A and the subscriber of information via the proxy as party B. Additional operations pertaining to PRE computation are as follows:\\
+
+\noindent \textbullet\ \textbf{Preprocess}$\left(pp,\lambda, sk_B = \left(1,s_B \right) \right)$ Sample uniformly distributed random polynomials $\alpha_i \sample \mathcal{U}_q$ and error polynomials $e_i \sample \chi_e$ for $i \in \left[0, \; \lceil \log_2(q)/r\rceil \right)$. Here $r$ is the relinearization window. Compute the following elements:
+\begin{align*}
+\gamma_i = \alpha_i\cdot s_B + pe_i \in R_q;  \; pk_B = \left( \alpha_i, \gamma_i \right)_{i \in \left\{0,1,\cdots, \lfloor \log_2(q)/r\rfloor  \right\}}
+\end{align*}
+\noindent \textbullet\ \textbf{ReKeyGen}$\left(pp, sk_A = \left(1,s_A\right), pk_B\right)$: Compute $\beta_i$ and set the re-encryption key as follows:
+$$\beta_i = \gamma_i - s_A\cdot (2^r)^i \in R_q, \; rk_{A\rightarrow B} = \left( \alpha_i, \beta_i \right)_{i \in \left\{0,1,\cdots, \lfloor \log_2(q)/r\rfloor  \right\}}$$
+\noindent \textbullet\ \textbf{ReEncrypt}$\left(pp, rk_{A\rightarrow B} = \left(\alpha_i,\beta_i\right), c = \left(c_0,c_1 \right) \right)$: To get the re-encrypted ciphertext $c' = \left(c_0',c_1' \right)$ first apply $2^r$ base decompositions and proceed as follows:
+\begin{align*}
+c_0' = c_0 + \sum_{i=0}^{\lfloor \log_2{(q)}/r \rfloor} \left( c_1^{\left(i \right)} \cdot \beta_i \right) , \; c_1' = \sum_{i=0}^{\lfloor \log_2{(q)}/r \rfloor} \left( c_1^{\left(i \right)} \cdot \alpha_i \right)
+\end{align*}
+where $c_1^{\left( i \right)}$ represents the $i$-th digit of the base-$2^r$ decomposition of $c_1$.\\
+
+
+Under the new secret key $sk = \left(1, s_B\right)$ decryption of the ciphertext $c' = \left(c_0',c_1'\right)$ can be shown as
+\begin{align*}
+c_0' - s_B\cdot c_1' & = c_0 + \sum_{i=0}^{\lfloor \log_2{(q)}/r \rfloor} \left( c_1^{\left(i \right)} \cdot \beta_i \right) - s_B \cdot \sum_{i=0}^{\lfloor \log_2{(q)}/r \rfloor} \left( c_1^{\left(i \right)} \cdot \alpha_i \right) \\
+& = c_0 + \sum_{i=0}^{\lfloor \log_2{(q)}/r \rfloor}\left( c_1^{\left(i \right)} \cdot \left\{ \alpha_i\cdot s_B + pe_i - s_A\cdot \left(2^r \right)^i \right\} \right) \\ 
+  &  \hskip 0.3\linewidth - s_B\cdot \sum_{i=0}^{\lfloor \log_2{(q)}/r \rfloor} \left( c_1^{\left(i \right)} \cdot \alpha_i \right) \\
+& = c_0 - s_A\cdot c_1 + pE_i; \; E_i = \sum_{i=0}^{\lfloor \log_2{(q)}/r \rfloor} \left( c_1^{\left( i \right)} \cdot e_i \right) 
+\end{align*}
+
+To preserve the correctness of the re-encrypted ciphertext $c'=\left(c_0',c_1'\right)$, we derive the following constraint:
+\begin{align*}
+\norm{t}_\infty & \leq 3\sqrt{n}pD +  \sqrt{n}pD\cdot D_r {\lceil \log_2{(q)}/r \rceil} \\ & \approx \sqrt{n}p D D_r \left( {\lceil \log_2{(q)}/r \rceil}+1\right) \ni r > 1
+\end{align*} 
+$$ \Rightarrow q \geq 2\sqrt{n}p DD_r \left({\lceil \log_2{(q)}/r \rceil} +1\right) $$
+where, $D_r$ is the bound of the bit decomposed polynomial in base $2^r$ representation.
+\subsection{Security}
+The security of PRE schemes is generally covered under indistinguishability against chosen-plaintext attacks (\indcpa). For brevity we omit the formal definition of the \indcpa\ security notion and capture the security with the following theorem. 
+\begin{theorem} \cite{polyakov2017fast} Under the $\mathbf{RLWE}_{\Phi,q,\chi_e}$ assumption, the BV-PRE scheme is $\indcpa$ secure. Specifically, for a poly-time adversary $\adv$, there exists a poly-time distinguisher $\ddv$ such that 
+$$\text{Adv}^{cpa}_{\adv}\left(\lambda \right) \leq \left( \rho\cdot\left(Q_{rk}+Q_{re}\right)+ N + 1\right)\cdot\text{Adv}^{\mathbf{RLWE}_{\Phi,q,\chi}}_{\ddv}$$ 
+
+\noindent where $Q_{rk}$ and $Q_{re}$ are the numbers of re-encryption key queries and re-encryption queries, respectively; N is the number of honest entities; $\lambda$ is the security parameter; $\Phi$ is the cyclotomic polynomial defining the ring $R_q = \mathbb{Z}_q[x]/\langle \Phi\rangle$ and $\rho = \lceil \log_2{ (q) }/r\rceil$. 
+\end{theorem}

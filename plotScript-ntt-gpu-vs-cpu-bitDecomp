@@ -1,0 +1,13 @@
+set terminal pngcairo size 600,600 enhanced font 'Verdana,10'
+set output 'gnu-vs-cpu-BitDecomp.png'
+set xlabel "Ring dimension, N = 2^k" font "Times-New-Roman,14"
+set ylabel "Runtime" font "Times-New-Roman,14"
+set style data histogram 
+set style histogram clustered gap 2
+set linetype 1 lc rgb 'royalblue' 
+set linetype 2 lc rgb 'light-red' 
+set linetype 3 lc rgb 'light-blue'
+set grid
+plot 'GPUvsCPUBitDecomp' using 2:xtic(1) title "GPU-GTX 1050" fs pattern 1 border -1, '' using 3:xtic(1) title "CPU-i7-7700HQ" fs pattern 2 border -1, '' using 4:xtic(1) title "GPU-Titan RTX" fs pattern 3 border -1
+#pause -1 "Hit any key to continue"
+

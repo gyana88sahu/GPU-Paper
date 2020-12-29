@@ -1,0 +1,228 @@
+\section{Number Theoretic Transform and Bit-Decomposition} \label{sec:lowerMath}
+
+\subsection{Number Theoretic Transform}
+
+Cryptosystems based on the RLWE security assumption are defined over a polynomial ring $R = \mathbb{Z}\left[ X \right] / \Phi_m\left( X\right) $ where $\Phi_m\left( X\right)$ is an irreducible monic cyclotomic polynomial of order $m$. This notation is extended to a polynomial $R_q$ modulo an integer $q$ where the coefficients of the polynomial are in the interval
+$\left(-q/2,q/2\right]$. Alternatively, an element $a \in R_q$ is simply considered to be a coefficient vector $\vec{\mathbf{a}} \in \mathbb{Z}_q^{\varphi\left( m \right)}$. While addition of these polynomials is quite efficient, multiplication leads to quadratic time complexity. To circumvent this inefficiency, we represent polynomial rings in the so called ``Evaluation'' representation. For a polynomial $a \in R_q$ the coefficients can be converted to the evaluation domain $\bar{a}$ by evaluating $a\left(X\right)$ at each of the $m$-th primitive roots of unity modulo $q$. The coefficients of $\bar{a}$ are related to polynomial $a$ through the relation $\bar{a}_i = a\left( \omega^i \right) \text{ mod } q$ where $\left(i,m\right)=1$ and $\omega$ is a $m$-th primitive root of unity modulo $q$. 
+
+This back and forth conversion of a polynomial can be achieved efficiently by using number theoretic transforms (NTT) which is roughly similar to the classical $n$-dimensional fast Fourier transform where a finite field is used instead of complex numbers. Concretely, in our implementation, we use the power of two cyclotomics ($m = 2^k$) where $\Phi_m\left(X\right)$ is maximally sparse and the ring dimension $n = \varphi\left( m\right) = m/2$ is also a power of two. The power of two cyclotomics along with NTT has become so pervasive in lattice based cryptography that the overall efficiency of the cryptosystem depends upon the latency of NTT procedure. For this reason, we chose to implement NTT as an iterative Cooley-Tukey algorithm. More specifically, we implemented the NTT routine with Fermat theoretic transform (FTT) optimization which eliminates interleaved zero paddings when using the conventional NTT procedure.
+
+\subsection{Parallel NTT}
+
+Exploiting the NVIDIA GPU architecture, we reduce the NTT latency further by mapping the butterfly computations of each of the $\log{n}$ stages to an independently processing thread of a thread block. In the NVIDIA CUDA architecture, each kernel or device function can be potentially divided into a $3$-dimensional array of blocks where a block further consists of several threads. Because of hardware restrictions, a maximum of $1024$ threads can be assigned to a block. Further, the threads within a block have the capability to share data and more importantly synchronize with each other. In our implementation, for small polynomials ($n \leq 1024$) we map the coefficients entirely to a thread block and synchronize the thread block after completion of a stage as shown in Figure \ref{fig:gpuNTT}. We use shared memory for storing the intermittent results as latency associated with global memory is higher than that of shared memory which resides on the chip. For larger polynomial rings ($n>1024$), we use a combination of block level synchronization and  stream level synchronization to avoid data race conditions. As stream level synchronization avoids data race conditions via global memory synchronization we pay the penalty of using slower memory but only for a fraction of the NTT procedure calls.
+
+The evaluation of the proposed NTT procedure on GPU platforms and CPU platforms is shown in Figure \ref{fig:cpugpuRunTimes}. From the figure, we can see that the CPU platform running on a single thread achieves slightly better performance for smaller ring dimensions. As the ring dimensions grow higher we can see that the GPU platform starts showing significant improvement in performance. 
+
+\begin{figure}	
+\centering
+\resizebox{5cm}{6cm}{%
+    
+\begin{tikzpicture}[scale = 1, node distance=0.3cm, auto, ->,    > = stealth',
+       shorten > = 1pt,decoration = {snake,   % <-- added
+                    pre length=3pt,post length=7pt,% <-- for better looking of arrow,
+                    }]
+                    
+\tikzstyle{n}= [circle, fill, minimum size=4pt,inner sep=0pt, outer sep=0pt]
+\tikzstyle{mul} = [circle,draw,inner sep=-1pt]
+\tikzstyle{thd} = [draw=blue, very thick, decorate]
+
+% Define two helper counters
+\newcounter{x}\newcounter{y}
+              
+    \foreach \y in {0,...,7}
+        \node[n, pin={[pin edge={latex'-,black}]left:$X_{i-1}(\y)$}]
+              (N-0-\y) at (0,-\y) {};
+              
+    % draw connector nodes
+    \foreach \y in {0,...,7}
+        \foreach \x / \c in {1/1}
+            \node[n, name=N-\c-\y] at (\x,-\y) {};
+            
+   % Draw outputs
+    \foreach \y in {0,...,7}
+        \node[n, pin={[pin edge={-latex',black}]right:$X_i(\y)$}]
+              (N-3-\y) at (2,-\y) {};         
+
+            
+    % draw x nodes
+    \foreach \y in {0,...,7}
+        \foreach \x / \c  in {1/2}
+            \node[mul, right of=N-\x-\y] (N-\c-\y) {${\times}$};                
+            
+    % horizontal connections 
+ \foreach \y in {0,...,7}
+        \foreach \x / \c in {0/1,1/2}
+        {
+            \path (N-\x-\y) edge[-] (N-\c-\y);
+       }  
+       
+      % Draw the W_8 coefficients
+    \setcounter{y}{0}
+    \foreach \i / \j in {0/0,1/0,2/0,3/0,0/1,1/1,2/1,3/1}
+    {
+        \path (N-2-\arabic{y}) edge[-] node {\tiny $W^{\i\cdot\j}_{i}$}
+              (N-3-\arabic{y});
+        \addtocounter{y}{1}
+    }  
+    
+    % Connect nodes
+    \foreach \sourcey / \desty in {0/4,1/5,2/6,3/7,
+                                   4/0,5/1,6/2,7/3}
+       \path (N-0-\sourcey.east) edge[-] (N-1-\desty.west); 
+       
+       
+ %draw sync rectangle
+ \draw[draw=black, fill=gray, name=sync1] (-3,0) rectangle (-2.5,-7);
+ \node[ label = {[rotate=-90,font=\large] Synchronization Barrier}] at (-3.05,-3.5) {};
+
+% Draw outputs
+\foreach \y in {0,...,7}
+	\path[draw=black, very thick, decorate] (2.5,-\y-0.5) -- (3.5,-\y-0.5) node[right] {Thread \y};
+	
+ %draw sync rectangle
+ \draw[draw=black, fill=gray, name=sync2] (5.25,0) rectangle (5.75,-7);	
+ \node[ label = {[rotate=-90,font=\large] Synchronization Barrier}] at (5.2,-3.5) {}; 
+         
+
+  \end{tikzpicture}
+  } %end of resizebox
+  \caption{Parallel implementation of the $i$-th stage of NTT on a GPU, $N=8$. }
+\label{fig:gpuNTT}
+\end{figure} 
+
+%\begin{figure}
+%\centering
+%\resizebox{\linewidth}{6cm}{
+%\includegraphics{"gnu-ntt-runTimeComparison"}
+%}
+%\caption{Comparison of CPU and GPU runtimes of NTT algorithm.}
+%\label{fig:cpugpuRunTimes}
+%\end{figure}
+
+\begin{figure}
+\centering
+\begin{tikzpicture}
+\begin{axis}[
+xlabel={Ring dimension, $N=2^k$},
+ylabel=Runtime (in ms),
+grid=major,
+ybar,
+bar width = 7pt,
+xtick=data,
+width=12cm, height=7cm,
+legend pos=north east,
+legend style={ at={(0.85,0.95)}},
+]
+\addplot[pattern=crosshatch, pattern color=blue!50] table [x=xcod, y=GTX]   {CPUVSGPU-OnDimension};
+\addplot[pattern=north east lines, pattern color=red!80] table [x=xcod, y=CPU] {CPUVSGPU-OnDimension};
+\addplot[pattern=crosshatch dots, pattern color=orange!150] table [x=xcod, y=RTX] {CPUVSGPU-OnDimension};
+\legend{GPU-GTX 1050, CPU-i7-7700HQ, GPU-Titan RTX};
+\end{axis}
+\end{tikzpicture}
+\caption{Comparison of CPU and GPU runtimes of the NTT algorithm.}
+\label{fig:cpugpuRunTimes}
+\end{figure}
+
+\subsection{Barrett Modulo Reduction and Arbitrary Precision Support}
+
+For modulo reduction, we used a variation of the generalized Barrett modulo reduction  \cite{dhem1998recent} as outlined in Algorithm \ref{algo:modBarrett}. Barrett modulo reduction requires a pre-computation term $\mu = \lfloor 2^{2b} / q\rfloor$ for a particular modulus $q$ and its bit width, $b = \lceil \log_2{q}\rceil$. We pre-compute these terms and transfer them to GPU global memory for read only access to any kernel. NVIDIA GPUs are restricted to a $32$-bit architecture and $64$-bit arithmetic are supported only through assembly code emulation. For this reason, we prefer moduli with bit width closer to $32$-bits so that the precomputation term $\mu$ fits into the word size. Concretely, we allow up to $29-30$ bit width moduli in our implementation. 
+
+Lattice based cryptosystems employ the addition of low norm noise terms to base their security on Ring-LWE and LWE assumptions. For preserving the correctness constraints so that ciphertexts are decrypted correctly, the modulus $q$ should be chosen large enough such that the final accumulated error terms do not ``wrap around'' modulo $q$. To extend support for larger moduli we store a set of increasing prime moduli $q_i$ by an application of the Chinese Remainder Theorem (CRT). We only reconstruct the coefficients into larger terms for the purpose of decryption or bit-decomposition where the polynomial needs to be represented in terms of the larger modulus, $q = \prod_{i=0}^{t-1} q_i$.
+
+Evaluation of the NTT procedure on a GPU with varying number of moduli, $t$ and ring dimension $N$ can be seen in Figure \ref{fig:gpuRunTimesOnModuli}. For most of the ring dimensions, the runtimes vary a little. This is due to the fact that GPUs have the capability to improve throughput by hiding latency with the concurrent execution of the NTT procedure on different polynomials. On a CPU platform the runtime is estimated to scale linearly with the number of moduli assuming a single thread execution environment.
+
+%Graph replace by pgfplot, looks better now!
+%\begin{figure}
+%\centering
+%\includegraphics[height=6cm, width=\linewidth]{"gnu-ntt-runTime-dimension-t"}
+%\caption{GPU runtimes of NTT algorithm with varying dimension and moduli, $t$.}
+%\label{fig:gpuRunTimesOnModuli}
+%\end{figure}
+
+
+\begin{figure}
+\centering
+\begin{tikzpicture}
+\begin{axis}[
+xlabel={Number of moduli, $t$},
+ylabel=Runtime (in ms),
+grid=major,
+width=10cm, height=7cm,
+legend pos = outer north east,
+]
+\addplot+[smooth] table [x=x, y=y1]   {GPURuntimesForCRT};
+\addplot+[smooth] table [x=x, y=y2]   {GPURuntimesForCRT};
+\addplot+[smooth] table [x=x, y=y3]   {GPURuntimesForCRT};
+\addplot+[smooth] table [x=x, y=y4]   {GPURuntimesForCRT};
+\addplot+[smooth] table [x=x, y=y5]   {GPURuntimesForCRT};
+\addplot+[smooth] table [x=x, y=y6]   {GPURuntimesForCRT};
+\addplot+[smooth] table [x=x, y=y7]   {GPURuntimesForCRT};
+\legend{$N=2^9$,$N=2^{10}$,$N=2^{11}$,$N=2^{12}$,$N=2^{13}$, $N=2^{14}$, $N=2^{15}$ };
+\end{axis}
+\end{tikzpicture}
+\caption{GPU runtimes of the NTT algorithm with varying dimension $N$ and moduli $t$.}
+\label{fig:gpuRunTimesOnModuli}
+\end{figure}  
+
+
+
+\begin{algorithm}
+\caption{Mod Barrett Reduction}
+\label{algo:modBarrett}
+	\SetAlgoLined
+	\SetKw{KwBy}{by}
+	\SetKwInOut{KwIn}{Input}
+	\SetKwInOut{KwOut}{Output}
+	\KwIn{ $x \in \left[0, \left(q-1\right)^2\right]$, modulus $q$, bit-width $b = \lceil \log{q} \rceil$, $\bar{q} = 2\cdot q$ and $\mu = \lfloor 2^{2b}/q \rfloor$.}
+	\KwOut{$z \gets x \% \; q$ }
+	$z \gets x \gg b$ \;
+	$z \gets z\cdot \mu$ \;
+	$z \gets z \gg b$ \;
+	$z \gets z\cdot q$ \; 
+	$x \gets x - z$ \;
+	\If{ $x >= \bar{q}$}{$z \gets x-\bar{q}$\; }
+	\If{ $z >= q$}{$z \gets z-q$\; }
+\KwRet{$z$}
+\end{algorithm}
+
+\subsection{Bit Decomposition} \label{subsec:bit-decomp}
+
+Bit decomposition along with the relinearization procedure forms the backbone of lattice based cryptography. While bit decomposing integers is simple in finite field arithmetic, it is accompanied with additional overheads in Ring-LWE based cryptosystems. In Ring-LWE cryptosystems, ciphertexts and other key elements are mostly present in evaluation representation. To bit decompose, polynomial rings need to be switched back to coefficient representation. At this stage, bit decomposition of the polynomial results in a vector of $b$ polynomials, where $b$ is the bit length of the modulus $q$. To perform further computations, these polynomials need to be converted back to evaluation representation by a series of NTT calls. Since the bit decomposed polynomials are independent of each other, we apply NTT procedures on them in parallel using a three dimensional CUDA grid mapping. To avoid race conditions in the NTT procedure, we provide the kernel with appropriate synchronization.  From Figure \ref{fig:gpuVScpuBitDecomp}, we can observe that our GPU implementation of bit decomposition outperforms runtimes of the CPU platform for all ring dimensions and further the speedups are more pronounced in case of higher ring dimensions. 
+
+%\begin{figure}
+%\centering
+%\resizebox{\linewidth}{6cm}{
+%%height=8cm, width=9cm
+%\includegraphics[]{"gnu-vs-cpu-BitDecomp"}
+%}
+%\caption{GPU vs CPU runtimes of bit decomposing polynomial ring with varying ring dimension, $N$.}
+%\label{fig:gpuVScpuBitDecomp}
+%\end{figure} 
+
+\begin{figure}
+\centering
+\begin{tikzpicture}
+\begin{axis}[
+xlabel={Ring dimension, $N=2^k$},
+ylabel=Runtime (in ms),
+grid=major,
+ybar,
+bar width = 5pt,
+xtick=data,
+width=12cm, height=7cm,
+legend style={ 
+	at={(0.85,0.96)},
+},
+]
+\addplot[pattern=crosshatch, pattern color=blue!50] table [x=x, y=y1]   {GPUvsCPUBitDecomp};
+\addplot[pattern=north east lines, pattern color=red!80] table [x=x, y=y2] {GPUvsCPUBitDecomp};
+\addplot[pattern=crosshatch dots, pattern color=orange!150] table [x=x, y=y3] {GPUvsCPUBitDecomp};
+\legend{GPU-GTX 1050, CPU-i7-7700HQ, GPU-Titan RTX};
+\end{axis}
+\end{tikzpicture}
+\caption{GPU vs CPU runtimes of bit decomposing a polynomial ring with varying ring dimension $N$.}
+\label{fig:gpuVScpuBitDecomp}
+\end{figure} 
+
+
+
